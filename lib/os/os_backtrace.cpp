@@ -46,6 +46,11 @@
 #  include <vector>
 #  include <cxxabi.h>
 #  include <backtrace.h>
+#elif WIN32
+#  include <array>
+#  include <unordered_map>
+#  include <Windows.h>
+#  include <cstring>
 #endif
 
 
@@ -470,8 +475,85 @@ void dump_backtrace() {
     backtraceProvider.dumpBacktrace();
 }
 
+#elif WIN32
 
-#else /* !HAVE_BACKTRACE */
+#define NUM_FRAMES 20
+#define NUM_SKIPPED_FRAMES 4 // there are four apitrace calls on the top of the stack
+
+class Win32BacktraceProvider {
+    std::unordered_map<DWORD, std::vector<RawStackFrame>> m_cache;
+    Id m_nextFrameId;
+    std::unordered_map<void*, char*> m_moduleNameCache;
+
+    char* getCachedModulePath(void* module)
+    {
+        auto entry = m_moduleNameCache.find(module);
+        if (entry != m_moduleNameCache.end()) {
+            return entry->second;
+        }
+
+        char moduleName[MAX_PATH];
+        GetModuleFileName((HMODULE)module, moduleName, MAX_PATH);
+
+        auto result = strdup(moduleName);
+        m_moduleNameCache[module] = result;
+        return result;
+    }
+
+public:
+    Win32BacktraceProvider():
+        m_nextFrameId(0)
+    {
+    }
+
+    ~Win32BacktraceProvider()
+    {
+        for (const auto& entry : m_moduleNameCache) {
+            free(entry.second);
+        }
+    }
+
+    std::vector<RawStackFrame> getBacktrace()
+    {
+        std::array<void*, NUM_FRAMES> frames;
+        DWORD hash = 0;
+
+        auto numFrames = RtlCaptureStackBackTrace(NUM_SKIPPED_FRAMES, NUM_FRAMES,
+            frames.data(), &hash);
+
+        auto cachedTrace = m_cache.find(hash);
+        if (cachedTrace != m_cache.end()) {
+            return cachedTrace->second;
+        }
+
+        std::vector<RawStackFrame> result;
+        result.reserve(numFrames);
+        for (int i = 0; i < numFrames; i++) {
+            void* base = nullptr;
+            RtlPcToFileHeader(frames[i], &base);
+            
+            RawStackFrame rawStackFrame;
+            rawStackFrame.module = getCachedModulePath(base);
+            rawStackFrame.id = m_nextFrameId++;
+            rawStackFrame.offset = (uintptr_t)frames[i] - (uintptr_t)base;
+
+            result.push_back(rawStackFrame);
+        }
+
+        m_cache[hash] = result;
+        return result;
+    }
+};
+
+std::vector<RawStackFrame> get_backtrace() {
+    static Win32BacktraceProvider provider;
+    return provider.getBacktrace();
+}
+
+void dump_backtrace() {
+}
+
+#else /* !WIN32 */
 
 std::vector<RawStackFrame> get_backtrace() {
     return std::vector<RawStackFrame>();
