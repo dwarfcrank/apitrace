@@ -178,6 +178,7 @@ void MainWindow::callItemSelected(const QModelIndex &index)
             }
         }
         m_ui.backtraceBrowser->setText(call->backtrace());
+        m_ui.backtraceBrowser->setStyleSheet("QTextBrowser { font-family: \"Consolas\"; font-size: 10pt }");
         m_ui.backtraceDock->setVisible(!call->backtrace().isNull());
         m_ui.vertexDataDock->setVisible(call->hasBinaryData());
         m_selectedEvent = call;
