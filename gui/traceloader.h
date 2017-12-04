@@ -4,6 +4,7 @@
 #include "apitrace.h"
 #include "trace_file.hpp"
 #include "trace_parser.hpp"
+#include "symbolloader.h"
 
 #include <QObject>
 #include <QList>
@@ -17,6 +18,10 @@ public:
     TraceLoader(QObject *parent=0);
     ~TraceLoader();
 
+    const SymbolStore& getSymbols() const
+    {
+        return m_symbols;
+    }
 
     ApiTraceCallSignature *signature(unsigned id);
     void addSignature(unsigned id, ApiTraceCallSignature *signature);
@@ -114,6 +119,7 @@ private:
     QList<ApiTraceFrame*> m_createdFrames;
 
     QHash<QString, QUrl> m_helpHash;
+    SymbolStore m_symbols;
 
     QVector<ApiTraceCallSignature*> m_signatures;
 };

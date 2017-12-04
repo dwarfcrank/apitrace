@@ -10,6 +10,7 @@
 #define QT_USE_FAST_OPERATOR_PLUS
 #include <QStringBuilder>
 #include <QTextDocument>
+#include <QFileInfo>
 
 const char * const styleSheet =
     ".call {\n"
@@ -714,6 +715,9 @@ ApiTraceCall::loadData(TraceLoader *loader,
     if (call->backtrace != NULL) {
         QString qbacktrace;
         for (auto frame : *call->backtrace) {
+            QFileInfo fileInfo(frame->module);
+            auto modName = fileInfo.baseName().toLower();
+
             if (frame->module != NULL) {
                 qbacktrace += QString("%1 ").arg(frame->module);
             }
@@ -728,6 +732,11 @@ ApiTraceCall::loadData(TraceLoader *loader,
             }
             else {
                 if (frame->offset >= 0) {
+                    const auto& symbol = loader->getSymbols().findByOffset(modName, frame->offset);
+                    if (symbol.offset >= 0) {
+                        qbacktrace += QString("%1+0x%2 ").arg(symbol.name).arg(frame->offset - symbol.offset, 0, 16);
+                    }
+
                     qbacktrace += QString("[0x%1]").arg(frame->offset, 0, 16);
                 }
             }

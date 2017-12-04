@@ -64,6 +64,13 @@ void TraceLoader::loadTrace(const QString &filename)
         return;
     }
 
+    SymbolLoader symLoader;
+    if (!symLoader.load("symbols.json")) {
+        qWarning() << "Couldn't load symbols";
+    }
+
+    m_symbols = symLoader.getSymbols();
+
     emit startedParsing();
 
     scanTrace();
